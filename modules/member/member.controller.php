@@ -380,7 +380,7 @@ class memberController extends member
 		{
 			if(isset($args->{$val}))
 			{
-				$args->{$val} = preg_replace('/[\pZ\pC]+/u', '', $args->{$val});
+				$args->{$val} = preg_replace('/[\pZ\pC]+/u', '', html_entity_decode($args->{$val}));
 			}
 		}
 		$output = $this->insertMember($args);
@@ -597,7 +597,7 @@ class memberController extends member
 		{
 			if(isset($args->{$val}))
 			{
-				$args->{$val} = preg_replace('/[\pZ\pC]+/u', '', $args->{$val});
+				$args->{$val} = preg_replace('/[\pZ\pC]+/u', '', html_entity_decode($args->{$val}));
 			}
 		}
 
@@ -766,6 +766,11 @@ class memberController extends member
 		$max_width = $config->profile_image_max_width;
 		$max_height = $config->profile_image_max_height;
 		$max_filesize = $config->profile_image_max_filesize;
+		foreach($config->signupForm as $val)
+		{
+			if($val->name == "profile_image")
+				$allow_transparent = $val->allow_transparent_thumbnail == 'Y';
+		}
 
 		Context::loadLang(_XE_PATH_ . 'modules/file/lang');
 
@@ -789,7 +794,7 @@ class memberController extends member
 		if(($width > $max_width || $height > $max_height ) && $type != 1)
 		{
 			$temp_filename = sprintf('files/cache/tmp/profile_image_%d.%s', $member_srl, $ext);
-			FileHandler::createImageFile($target_file, $temp_filename, $max_width, $max_height, $ext);
+			FileHandler::createImageFile($target_file, $temp_filename, $max_width, $max_height, $ext, 'crop', $allow_transparent);
 
 			// 파일 용량 제한
 			FileHandler::clearStatCache($temp_filename);
@@ -1310,7 +1315,27 @@ class memberController extends member
 		if(ztime($output->data->regdate) < $_SERVER['REQUEST_TIME'] + zgap() - 86400)
 		{
 			executeQuery('member.deleteAuthMail', $args);
-			return $this->stop('msg_invalid_auth_key');
+
+			$memberInfo = $oMemberModel->getMemberInfoByMemberSrl($member_srl);
+
+			$oPassword = new Password();
+			$auth_args = new stdClass();
+			$auth_args->user_id = $memberInfo->user_id;
+			$auth_args->member_srl = $memberInfo->member_srl;
+			$auth_args->new_password = '';
+			$auth_args->auth_key = $oPassword->createSecureSalt(40);
+			$auth_args->is_register = 'Y';
+
+			$output = executeQuery('member.insertAuthMail', $auth_args);
+			if(!$output->toBool()) return $output;
+
+			// resend auth mail.
+			$this->_sendAuthMail($auth_args, $memberInfo);
+
+			$this->setTemplatePath($this->module_path.'tpl');
+			$this->setTemplateFile('msg_failed_auth');
+
+			return;
 		}
 
 		$args->password = $output->data->new_password;

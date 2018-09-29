@@ -85,7 +85,7 @@ class memberAdminController extends member
 		{
 			if(isset($args->{$val}))
 			{
-				$args->{$val} = preg_replace('/[\pZ\pC]+/u', '', $args->{$val});
+				$args->{$val} = preg_replace('/[\pZ\pC]+/u', '', html_entity_decode($args->{$val}));
 			}
 		}
 
@@ -292,6 +292,7 @@ class memberAdminController extends member
 				$signupItem->max_width = $all_args->{$key.'_max_width'};
 				$signupItem->max_height = $all_args->{$key.'_max_height'};
 				$signupItem->max_filesize = $all_args->{$key.'_max_filesize'};
+				$signupItem->allow_transparent_thumbnail = $all_args->{$key.'_transparent_thumbnail'};
 			}
 
 			// set extends form
